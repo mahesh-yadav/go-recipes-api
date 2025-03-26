@@ -2,9 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
+
+	"slices"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/xid"
@@ -111,6 +114,30 @@ func DeleteRecipeHandler(c *gin.Context) {
 	})
 }
 
+func SearchRecipeHandler(c *gin.Context) {
+	query := c.Query("tag")
+	fmt.Println(query)
+	if query == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Tag query parameter is required",
+		})
+		return
+	}
+
+	listOfRecipes := make([]Recipe, 0)
+
+	for _, recipe := range recipes {
+		if slices.Contains(recipe.Tags, query) {
+			listOfRecipes = append(listOfRecipes, recipe)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"count":   len(listOfRecipes),
+		"recipes": listOfRecipes,
+	})
+}
+
 func main() {
 	initDb()
 	router := gin.Default()
@@ -119,5 +146,6 @@ func main() {
 	router.GET("/recipes", ListRecipesHandler)
 	router.PUT("/recipes/:id", UpdateRecipeHandler)
 	router.DELETE("/recipes/:id", DeleteRecipeHandler)
+	router.GET("/recipes/search", SearchRecipeHandler)
 	router.Run()
 }

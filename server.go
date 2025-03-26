@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -27,11 +26,15 @@ func initDb() {
 // Data Models
 type Recipe struct {
 	ID           string    `json:"id"`
-	Name         string    `json:"name"`
+	Name         string    `json:"name" binding:"required"`
 	Tags         []string  `json:"tags"`
-	Ingredients  []string  `json:"ingredients"`
+	Ingredients  []string  `json:"ingredients" binding:"required"`
 	Instructions []string  `json:"instructions"`
 	PublishedAt  time.Time `json:"published_at"`
+}
+
+type SearchParams struct {
+	Tag string `form:"tag" binding:"required,min=3"`
 }
 
 // Route Handlers
@@ -115,11 +118,11 @@ func DeleteRecipeHandler(c *gin.Context) {
 }
 
 func SearchRecipeHandler(c *gin.Context) {
-	query := c.Query("tag")
-	fmt.Println(query)
-	if query == "" {
+	var searchParams SearchParams
+
+	if err := c.ShouldBindQuery(&searchParams); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Tag query parameter is required",
+			"error": err.Error(),
 		})
 		return
 	}
@@ -127,7 +130,7 @@ func SearchRecipeHandler(c *gin.Context) {
 	listOfRecipes := make([]Recipe, 0)
 
 	for _, recipe := range recipes {
-		if slices.Contains(recipe.Tags, query) {
+		if slices.Contains(recipe.Tags, searchParams.Tag) {
 			listOfRecipes = append(listOfRecipes, recipe)
 		}
 	}

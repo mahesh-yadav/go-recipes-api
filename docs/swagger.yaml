@@ -1,0 +1,234 @@
+basePath: /
+definitions:
+  httputil.HTTPError:
+    properties:
+      code:
+        example: 400
+        type: integer
+      message:
+        example: status bad request
+        type: string
+    type: object
+  main.AddUpdateRecipe:
+    properties:
+      ingredients:
+        example:
+        - 2 1/4 cups all-purpose flour
+        - 1 tsp baking soda
+        - 1 cup butter
+        - 3/4 cup granulated sugar
+        - 3/4 cup brown sugar
+        - 2 large eggs
+        - 2 cups semi-sweet chocolate chips
+        items:
+          type: string
+        type: array
+      instructions:
+        example:
+        - Preheat oven to 375°F (190°C)
+        - Mix dry ingredients
+        - Cream butter and sugars
+        - Beat in eggs
+        - Stir in chocolate chips
+        - Drop spoonfuls onto baking sheets
+        - Bake for 9 to 11 minutes
+        items:
+          type: string
+        type: array
+      name:
+        example: Chocolate Chip Cookies
+        type: string
+      tags:
+        example:
+        - dessert
+        - snack
+        items:
+          type: string
+        type: array
+    required:
+    - ingredients
+    - name
+    type: object
+  main.ListRecipes:
+    properties:
+      count:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/main.Recipe'
+        type: array
+    type: object
+  main.Recipe:
+    properties:
+      id:
+        example: c0283p3d0cvuglq85log
+        type: string
+      ingredients:
+        example:
+        - 2 1/4 cups all-purpose flour
+        - 1 tsp baking soda
+        - 1 cup butter
+        - 3/4 cup granulated sugar
+        - 3/4 cup brown sugar
+        - 2 large eggs
+        - 2 cups semi-sweet chocolate chips
+        items:
+          type: string
+        type: array
+      instructions:
+        example:
+        - Preheat oven to 375°F (190°C)
+        - Mix dry ingredients
+        - Cream butter and sugars
+        - Beat in eggs
+        - Stir in chocolate chips
+        - Drop spoonfuls onto baking sheets
+        - Bake for 9 to 11 minutes
+        items:
+          type: string
+        type: array
+      name:
+        example: Chocolate Chip Cookies
+        type: string
+      published_at:
+        example: "2023-03-10T15:04:05Z"
+        type: string
+      tags:
+        example:
+        - dessert
+        - snack
+        items:
+          type: string
+        type: array
+    required:
+    - ingredients
+    - name
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: This is a simple API for managing recipes.
+  title: Recipes API
+  version: "1.0"
+paths:
+  /recipes:
+    get:
+      consumes:
+      - application/json
+      description: List Recipes
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.ListRecipes'
+      summary: List Recipes
+      tags:
+      - recipes
+    post:
+      consumes:
+      - application/json
+      description: Create a new recipe
+      parameters:
+      - description: Add Recipe
+        in: body
+        name: recipe
+        required: true
+        schema:
+          $ref: '#/definitions/main.AddUpdateRecipe'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/main.Recipe'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httputil.HTTPError'
+      summary: Create a new recipe
+      tags:
+      - recipes
+  /recipes/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a recipe
+      parameters:
+      - description: Recipe ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+          schema:
+            $ref: '#/definitions/main.Recipe'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httputil.HTTPError'
+      summary: Delete a recipe
+      tags:
+      - recipes
+    put:
+      consumes:
+      - application/json
+      description: Update a recipe
+      parameters:
+      - description: Recipe ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update Recipe
+        in: body
+        name: recipe
+        required: true
+        schema:
+          $ref: '#/definitions/main.AddUpdateRecipe'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Recipe'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httputil.HTTPError'
+      summary: Update a recipe
+      tags:
+      - recipes
+  /recipes/search:
+    get:
+      consumes:
+      - application/json
+      description: Search recipes by tag
+      parameters:
+      - description: Tag to search for
+        in: query
+        name: tag
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.ListRecipes'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httputil.HTTPError'
+      summary: Search recipes by tag
+      tags:
+      - recipes
+swagger: "2.0"

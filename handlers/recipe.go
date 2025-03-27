@@ -48,7 +48,7 @@ func (handler *RecipeHandler) ListRecipesHandler(c *gin.Context) {
 	if handler.config.EnableRedisCache {
 		redisResults, err = handler.redisClient.Get(handler.ctx, "recipes").Result()
 	}
-	if config.GetConfig().EnableRedisCache == false || err == redis.Nil {
+	if !config.GetConfig().EnableRedisCache || err == redis.Nil {
 		log.Println("Fetching from MongoDB...")
 
 		cursor, err := handler.collection.Find(context.TODO(), bson.D{})

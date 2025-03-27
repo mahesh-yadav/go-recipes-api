@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"time"
@@ -9,19 +10,22 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mahesh-yadav/go-recipes-api/models"
 	"github.com/mahesh-yadav/go-recipes-api/utils"
+	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type RecipeHandler struct {
-	collection *mongo.Collection
-	ctx        context.Context
+	collection  *mongo.Collection
+	ctx         context.Context
+	redisClient *redis.Client
 }
 
-func NewRecipeHandler(ctx context.Context, collection *mongo.Collection) *RecipeHandler {
+func NewRecipeHandler(ctx context.Context, collection *mongo.Collection, redisClient *redis.Client) *RecipeHandler {
 	return &RecipeHandler{
-		collection: collection,
-		ctx:        ctx,
+		collection:  collection,
+		ctx:         ctx,
+		redisClient: redisClient,
 	}
 }
 
@@ -36,27 +40,55 @@ func NewRecipeHandler(ctx context.Context, collection *mongo.Collection) *Recipe
 //	@Failure		500	{object}	utils.HTTPError
 //	@Router			/recipes [get]
 func (handler *RecipeHandler) ListRecipesHandler(c *gin.Context) {
-	cursor, err := handler.collection.Find(context.TODO(), bson.D{})
-	if err != nil {
-		utils.NewError(c, http.StatusInternalServerError, err)
-		return
-	}
-	defer cursor.Close(handler.ctx)
+	results, err := handler.redisClient.Get(handler.ctx, "recipes").Result()
+	if err == redis.Nil {
+		log.Println("Redis cache miss. Fetching from MongoDB...")
 
-	recipes := make([]models.ViewRecipe, 0)
-	for cursor.Next(context.TODO()) {
-		var recipe models.ViewRecipe
-		if err := cursor.Decode(&recipe); err != nil {
+		cursor, err := handler.collection.Find(context.TODO(), bson.D{})
+		if err != nil {
 			utils.NewError(c, http.StatusInternalServerError, err)
 			return
 		}
-		recipes = append(recipes, recipe)
-	}
+		defer cursor.Close(handler.ctx)
 
-	c.JSON(http.StatusOK, models.ListRecipes{
-		Count: len(recipes),
-		Data:  recipes,
-	})
+		recipes := make([]models.ViewRecipe, 0)
+		for cursor.Next(context.TODO()) {
+			var recipe models.ViewRecipe
+			if err := cursor.Decode(&recipe); err != nil {
+				utils.NewError(c, http.StatusInternalServerError, err)
+				return
+			}
+			recipes = append(recipes, recipe)
+		}
+
+		data, err := json.Marshal(recipes)
+		if err != nil {
+			utils.NewError(c, http.StatusInternalServerError, err)
+			return
+		}
+		handler.redisClient.Set(handler.ctx, "recipes", string(data), 0)
+
+		c.JSON(http.StatusOK, models.ListRecipes{
+			Count: len(recipes),
+			Data:  recipes,
+		})
+	} else if err != nil {
+		utils.NewError(c, http.StatusInternalServerError, err)
+		return
+	} else {
+		log.Println("Retrieved from Redis cache...")
+		recipes := make([]models.ViewRecipe, 0)
+		err := json.Unmarshal([]byte(results), &recipes)
+		if err != nil {
+			utils.NewError(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, models.ListRecipes{
+			Count: len(recipes),
+			Data:  recipes,
+		})
+	}
 }
 
 // GetRecipeHandler godoc
@@ -85,7 +117,6 @@ func (handler *RecipeHandler) GetRecipeHandler(c *gin.Context) {
 
 	var recipe models.ViewRecipe
 	err = handler.collection.FindOne(handler.ctx, filter).Decode(&recipe)
-	log.Println(err)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			utils.NewError(c, http.StatusNotFound, err)
@@ -132,6 +163,8 @@ func (handler *RecipeHandler) CreateRecipeHandler(c *gin.Context) {
 		return
 	}
 
+	log.Println("Removing recipes from Redis cache...")
+	handler.redisClient.Del(handler.ctx, "recipes")
 	c.JSON(http.StatusCreated, result)
 }
 
@@ -180,6 +213,8 @@ func (handler *RecipeHandler) UpdateRecipeHandler(c *gin.Context) {
 		return
 	}
 
+	log.Println("Removing recipes from Redis cache...")
+	handler.redisClient.Del(handler.ctx, "recipes")
 	c.JSON(http.StatusOK, result)
 }
 
@@ -211,6 +246,8 @@ func (handler *RecipeHandler) DeleteRecipeHandler(c *gin.Context) {
 		return
 	}
 
+	log.Println("Removing recipes from Redis cache...")
+	handler.redisClient.Del(handler.ctx, "recipes")
 	c.JSON(http.StatusOK, result)
 }
 

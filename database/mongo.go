@@ -17,7 +17,7 @@ import (
 
 var mongoClient *mongo.Client
 
-func ConnectToDB(config *config.Config) {
+func ConnectToMongoDB(config *config.Config) {
 	clientOptions := options.Client().SetTimeout(10 * time.Second).ApplyURI(config.MongoUri)
 	client, err := mongo.Connect(clientOptions)
 	if err != nil {
@@ -36,12 +36,12 @@ func ConnectToDB(config *config.Config) {
 
 func GetMongoClient(config *config.Config) *mongo.Client {
 	if mongoClient == nil {
-		ConnectToDB(config)
+		ConnectToMongoDB(config)
 	}
 	return mongoClient
 }
 
-func GetCollection(config *config.Config, collectionName string) *mongo.Collection {
+func GetMongoCollection(config *config.Config, collectionName string) *mongo.Collection {
 	client := GetMongoClient(config)
 	return client.Database(config.MongoDBName).Collection(collectionName)
 }

@@ -23,16 +23,19 @@ func main() {
 
 	gin.SetMode(config.GinMode)
 
-	database.ConnectToDB(config)
+	database.ConnectToMongoDB(config)
 
 	ctx := context.Background()
-	collection := database.GetCollection(config, "recipes")
+	collection := database.GetMongoCollection(config, "recipes")
 
 	if config.InitializeDB {
 		database.InitDB(collection)
 	}
 
-	recipesHandler := handlers.NewRecipeHandler(ctx, collection)
+	database.ConnectToRedis(config)
+	redisClient := database.GetRedisClient(config)
+
+	recipesHandler := handlers.NewRecipeHandler(ctx, collection, redisClient)
 
 	router := gin.Default()
 

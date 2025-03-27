@@ -9,6 +9,7 @@ import (
 	_ "github.com/mahesh-yadav/go-recipes-api/docs"
 	"github.com/mahesh-yadav/go-recipes-api/handlers"
 	"github.com/mahesh-yadav/go-recipes-api/logger"
+	"github.com/mahesh-yadav/go-recipes-api/middleware"
 	"github.com/rs/zerolog/log"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -43,12 +44,17 @@ func main() {
 
 	router := gin.Default()
 
-	router.POST("/recipes", recipesHandler.CreateRecipeHandler)
 	router.GET("/recipes", recipesHandler.ListRecipesHandler)
-	router.GET("/recipes/:id", recipesHandler.GetRecipeHandler)
-	router.PUT("/recipes/:id", recipesHandler.UpdateRecipeHandler)
-	router.DELETE("/recipes/:id", recipesHandler.DeleteRecipeHandler)
-	router.GET("/recipes/search", recipesHandler.SearchRecipeHandler)
+
+	authorized := router.Group("/")
+	authorized.Use(middleware.AuthMiddlewareAPIKey())
+	{
+		authorized.POST("/recipes", recipesHandler.CreateRecipeHandler)
+		authorized.GET("/recipes/:id", recipesHandler.GetRecipeHandler)
+		authorized.PUT("/recipes/:id", recipesHandler.UpdateRecipeHandler)
+		authorized.DELETE("/recipes/:id", recipesHandler.DeleteRecipeHandler)
+		authorized.GET("/recipes/search", recipesHandler.SearchRecipeHandler)
+	}
 
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 

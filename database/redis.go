@@ -2,7 +2,8 @@ package database
 
 import (
 	"context"
-	"log"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/mahesh-yadav/go-recipes-api/config"
 	"github.com/redis/go-redis/v9"
@@ -18,12 +19,15 @@ func ConnectToRedis(config *config.Config) {
 			DB:       config.RedisDB,
 		})
 
-		status := client.Ping(context.Background())
+		err := client.Ping(context.Background()).Err()
+		if err != nil {
+			log.Fatal().Err(err).Msg("Error connecting to Redis")
+		}
 		redisClient = client
 
-		log.Println("Successfully connected to Redis: ", status)
+		log.Info().Msg("Successfully connected to Redis")
 	} else {
-		log.Println("Redis cache is disabled")
+		log.Info().Msg("Redis cache is disabled")
 	}
 }
 

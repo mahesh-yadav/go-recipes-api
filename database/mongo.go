@@ -3,9 +3,10 @@ package database
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"os"
 	"time"
+
+	"github.com/rs/zerolog/log"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -18,20 +19,20 @@ import (
 var mongoClient *mongo.Client
 
 func ConnectToMongoDB(config *config.Config) {
-	clientOptions := options.Client().SetTimeout(10 * time.Second).ApplyURI(config.MongoUri)
+	clientOptions := options.Client().SetTimeout(time.Duration(config.MongoServerSelectionTimeoutMS) * time.Millisecond).ApplyURI(config.MongoUri)
 	client, err := mongo.Connect(clientOptions)
 	if err != nil {
-		log.Fatal("Error connecting to MongoDB", err)
+		log.Fatal().Err(err).Msg("Error connecting to MongoDB")
 	}
 
 	var result bson.M
 	if err := client.Database("admin").RunCommand(context.TODO(), bson.D{{Key: "ping", Value: 1}}).Decode(&result); err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("Error pinging to MongoDB")
 	}
 
 	mongoClient = client
 
-	log.Println("Successfully connected to MongoDB!")
+	log.Info().Msg("Successfully connected to MongoDB!")
 }
 
 func GetMongoClient(config *config.Config) *mongo.Client {
@@ -51,7 +52,7 @@ func InitDB(collection *mongo.Collection) {
 	file, _ := os.ReadFile("recipes.json")
 	err := json.Unmarshal(file, &recipes)
 	if err != nil {
-		log.Fatal("error unmarshalling: ", err)
+		log.Fatal().Err(err).Msg("Error unmarshalling JSON file")
 	}
 
 	var listOfRecipes []interface{}
@@ -61,8 +62,8 @@ func InitDB(collection *mongo.Collection) {
 
 	insertManyResult, err := collection.InsertMany(context.Background(), listOfRecipes)
 	if err != nil {
-		log.Fatal("error inserting: ", err)
+		log.Fatal().Err(err).Msg("Error inserting documents to MongoDB")
 	}
 
-	log.Println("Inserted recipes: ", len(insertManyResult.InsertedIDs))
+	log.Info().Int("Inserted recipes: ", len(insertManyResult.InsertedIDs))
 }

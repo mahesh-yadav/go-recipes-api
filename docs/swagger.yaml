@@ -1,6 +1,6 @@
 basePath: /
 definitions:
-  main.AddUpdateRecipe:
+  models.AddUpdateRecipe:
     properties:
       ingredients:
         example:
@@ -42,16 +42,16 @@ definitions:
     - name
     - tags
     type: object
-  main.ListRecipes:
+  models.ListRecipes:
     properties:
       count:
         type: integer
       data:
         items:
-          $ref: '#/definitions/main.ViewRecipe'
+          $ref: '#/definitions/models.ViewRecipe'
         type: array
     type: object
-  main.ViewRecipe:
+  models.ViewRecipe:
     properties:
       id:
         example: c0283p3d0cvuglq85log
@@ -93,6 +93,11 @@ definitions:
         items:
           type: string
         type: array
+    required:
+    - ingredients
+    - instructions
+    - name
+    - tags
     type: object
   utils.HTTPError:
     properties:
@@ -114,14 +119,14 @@ paths:
     get:
       consumes:
       - application/json
-      description: List Recipes
+      description: Returns list of recipes
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/main.ListRecipes'
+            $ref: '#/definitions/models.ListRecipes'
         "500":
           description: Internal Server Error
           schema:
@@ -139,7 +144,7 @@ paths:
         name: recipe
         required: true
         schema:
-          $ref: '#/definitions/main.AddUpdateRecipe'
+          $ref: '#/definitions/models.AddUpdateRecipe'
       produces:
       - application/json
       responses:
@@ -183,6 +188,38 @@ paths:
       summary: Delete a recipe
       tags:
       - recipes
+    get:
+      consumes:
+      - application/json
+      description: Returns a single recipe
+      parameters:
+      - description: Recipe ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ViewRecipe'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.HTTPError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.HTTPError'
+      summary: Get a recipe
+      tags:
+      - recipes
     put:
       consumes:
       - application/json
@@ -198,7 +235,7 @@ paths:
         name: recipe
         required: true
         schema:
-          $ref: '#/definitions/main.AddUpdateRecipe'
+          $ref: '#/definitions/models.AddUpdateRecipe'
       produces:
       - application/json
       responses:
@@ -232,7 +269,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/main.ListRecipes'
+            $ref: '#/definitions/models.ListRecipes'
         "400":
           description: Bad Request
           schema:

@@ -17,7 +17,7 @@ const docTemplate = `{
     "paths": {
         "/recipes": {
             "get": {
-                "description": "List Recipes",
+                "description": "Returns list of recipes",
                 "consumes": [
                     "application/json"
                 ],
@@ -32,7 +32,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/main.ListRecipes"
+                            "$ref": "#/definitions/models.ListRecipes"
                         }
                     },
                     "500": {
@@ -62,7 +62,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/main.AddUpdateRecipe"
+                            "$ref": "#/definitions/models.AddUpdateRecipe"
                         }
                     }
                 ],
@@ -111,7 +111,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/main.ListRecipes"
+                            "$ref": "#/definitions/models.ListRecipes"
                         }
                     },
                     "400": {
@@ -130,6 +130,54 @@ const docTemplate = `{
             }
         },
         "/recipes/{id}": {
+            "get": {
+                "description": "Returns a single recipe",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "recipes"
+                ],
+                "summary": "Get a recipe",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Recipe ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ViewRecipe"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.HTTPError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.HTTPError"
+                        }
+                    }
+                }
+            },
             "put": {
                 "description": "Update a recipe",
                 "consumes": [
@@ -156,7 +204,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/main.AddUpdateRecipe"
+                            "$ref": "#/definitions/models.AddUpdateRecipe"
                         }
                     }
                 ],
@@ -220,7 +268,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "main.AddUpdateRecipe": {
+        "models.AddUpdateRecipe": {
             "type": "object",
             "required": [
                 "ingredients",
@@ -275,7 +323,7 @@ const docTemplate = `{
                 }
             }
         },
-        "main.ListRecipes": {
+        "models.ListRecipes": {
             "type": "object",
             "properties": {
                 "count": {
@@ -284,13 +332,19 @@ const docTemplate = `{
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/main.ViewRecipe"
+                        "$ref": "#/definitions/models.ViewRecipe"
                     }
                 }
             }
         },
-        "main.ViewRecipe": {
+        "models.ViewRecipe": {
             "type": "object",
+            "required": [
+                "ingredients",
+                "instructions",
+                "name",
+                "tags"
+            ],
             "properties": {
                 "id": {
                     "type": "string",

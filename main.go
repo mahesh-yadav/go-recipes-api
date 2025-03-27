@@ -8,6 +8,8 @@ import (
 	"github.com/mahesh-yadav/go-recipes-api/database"
 	_ "github.com/mahesh-yadav/go-recipes-api/docs"
 	"github.com/mahesh-yadav/go-recipes-api/handlers"
+	"github.com/mahesh-yadav/go-recipes-api/logger"
+	"github.com/rs/zerolog/log"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -20,6 +22,8 @@ import (
 // @BasePath		/
 func main() {
 	config := config.GetConfig()
+
+	log.Logger = logger.SetupLogger(config)
 
 	gin.SetMode(config.GinMode)
 

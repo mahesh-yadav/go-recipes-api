@@ -3,9 +3,10 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
 	"time"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mahesh-yadav/go-recipes-api/config"
@@ -39,7 +40,7 @@ func NewRecipeHandler(ctx context.Context, collection *mongo.Collection, redisCl
 //	@Tags			recipes
 //	@Accept			json
 //	@Produce		json
-//	@Success		200	{object}	ListRecipes
+//	@Success		200	{object}	models.ListRecipes
 //	@Failure		500	{object}	utils.HTTPError
 //	@Router			/recipes [get]
 func (handler *RecipeHandler) ListRecipesHandler(c *gin.Context) {
@@ -49,7 +50,7 @@ func (handler *RecipeHandler) ListRecipesHandler(c *gin.Context) {
 		redisResults, err = handler.redisClient.Get(handler.ctx, "recipes").Result()
 	}
 	if !config.GetConfig().EnableRedisCache || err == redis.Nil {
-		log.Println("Fetching from MongoDB...")
+		log.Info().Msg("Fetching from MongoDB...")
 
 		cursor, err := handler.collection.Find(context.TODO(), bson.D{})
 		if err != nil {
@@ -85,7 +86,7 @@ func (handler *RecipeHandler) ListRecipesHandler(c *gin.Context) {
 		utils.NewError(c, http.StatusInternalServerError, err)
 		return
 	} else {
-		log.Println("Retrieved from Redis cache...")
+		log.Info().Msg("Retrieved from Redis cache...")
 		recipes := make([]models.ViewRecipe, 0)
 		err := json.Unmarshal([]byte(redisResults), &recipes)
 		if err != nil {
@@ -107,8 +108,8 @@ func (handler *RecipeHandler) ListRecipesHandler(c *gin.Context) {
 //	@Tags			recipes
 //	@Accept			json
 //	@Produce		json
-//	@Param			id		path	string			true	"Recipe ID"
-//	@Success		200
+//	@Param			id	path		string	true	"Recipe ID"
+//	@Success		200	{object}	models.ViewRecipe
 //	@Failure		400	{object}	utils.HTTPError
 //	@Failure		404	{object}	utils.HTTPError
 //	@Failure		500	{object}	utils.HTTPError
@@ -146,7 +147,7 @@ func (handler *RecipeHandler) GetRecipeHandler(c *gin.Context) {
 //	@Tags			recipes
 //	@Accept			json
 //	@Produce		json
-//	@Param			recipe	body	AddUpdateRecipe	true	"Add Recipe"
+//	@Param			recipe	body	models.AddUpdateRecipe	true	"Add Recipe"
 //	@Success		201
 //	@Failure		400	{object}	utils.HTTPError
 //	@Failure		500	{object}	utils.HTTPError
@@ -173,7 +174,7 @@ func (handler *RecipeHandler) CreateRecipeHandler(c *gin.Context) {
 	}
 
 	if handler.config.EnableRedisCache {
-		log.Println("Removing recipes from Redis cache...")
+		log.Info().Msg("Removing recipes from Redis cache...")
 		handler.redisClient.Del(handler.ctx, "recipes")
 	}
 	c.JSON(http.StatusCreated, result)
@@ -186,8 +187,8 @@ func (handler *RecipeHandler) CreateRecipeHandler(c *gin.Context) {
 //	@Tags			recipes
 //	@Accept			json
 //	@Produce		json
-//	@Param			id		path	string			true	"Recipe ID"
-//	@Param			recipe	body	AddUpdateRecipe	true	"Update Recipe"
+//	@Param			id		path	string					true	"Recipe ID"
+//	@Param			recipe	body	models.AddUpdateRecipe	true	"Update Recipe"
 //	@Success		200
 //	@Failure		400	{object}	utils.HTTPError
 //	@Failure		500	{object}	utils.HTTPError
@@ -225,7 +226,7 @@ func (handler *RecipeHandler) UpdateRecipeHandler(c *gin.Context) {
 	}
 
 	if handler.config.EnableRedisCache {
-		log.Println("Removing recipes from Redis cache...")
+		log.Info().Msg("Removing recipes from Redis cache...")
 		handler.redisClient.Del(handler.ctx, "recipes")
 	}
 	c.JSON(http.StatusOK, result)
@@ -260,7 +261,7 @@ func (handler *RecipeHandler) DeleteRecipeHandler(c *gin.Context) {
 	}
 
 	if handler.config.EnableRedisCache {
-		log.Println("Removing recipes from Redis cache...")
+		log.Info().Msg("Removing recipes from Redis cache...")
 		handler.redisClient.Del(handler.ctx, "recipes")
 	}
 	c.JSON(http.StatusOK, result)
@@ -274,7 +275,7 @@ func (handler *RecipeHandler) DeleteRecipeHandler(c *gin.Context) {
 //	@Accept			json
 //	@Produce		json
 //	@Param			tag	query		string	true	"Tag to search for"
-//	@Success		200	{object}	ListRecipes
+//	@Success		200	{object}	models.ListRecipes
 //	@Failure		400	{object}	utils.HTTPError
 //	@Failure		500	{object}	utils.HTTPError
 //	@Router			/recipes/search [get]

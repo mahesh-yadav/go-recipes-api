@@ -35,7 +35,7 @@ func main() {
 	database.ConnectToRedis(config)
 	redisClient := database.GetRedisClient(config)
 
-	recipesHandler := handlers.NewRecipeHandler(ctx, collection, redisClient)
+	recipesHandler := handlers.NewRecipeHandler(ctx, collection, redisClient, config)
 
 	router := gin.Default()
 

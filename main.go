@@ -1,53 +1,78 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
-	"errors"
+	"log"
 	"net/http"
 	"os"
 	"time"
 
-	"slices"
-
 	"github.com/gin-gonic/gin"
+	"github.com/mahesh-yadav/go-recipes-api/config"
+	"github.com/mahesh-yadav/go-recipes-api/database"
 	_ "github.com/mahesh-yadav/go-recipes-api/docs"
-	"github.com/mahesh-yadav/go-recipes-api/httputil"
-	"github.com/rs/xid"
+	"github.com/mahesh-yadav/go-recipes-api/utils"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
-// In-Memory DB
-var recipes []Recipe
+func initDb(config *config.Config) {
+	if config.InitializeDB {
+		recipes := make([]Recipe, 0)
+		file, _ := os.ReadFile("recipes.json")
+		err := json.Unmarshal(file, &recipes)
+		if err != nil {
+			log.Fatal("error unmarshalling: ", err)
+		}
 
-func initDb() {
-	recipes = make([]Recipe, 0)
+		var listOfRecipes []interface{}
+		for _, recipe := range recipes {
+			listOfRecipes = append(listOfRecipes, recipe)
+		}
 
-	file, _ := os.ReadFile("recipes.json")
+		collection := database.GetCollection(config, "recipes")
 
-	json.Unmarshal(file, &recipes)
+		insertManyResult, err := collection.InsertMany(context.Background(), listOfRecipes)
+		if err != nil {
+			log.Fatal("error inserting: ", err)
+		}
+
+		log.Println("Inserted recipes: ", len(insertManyResult.InsertedIDs))
+	} else {
+		log.Println("Collection already exists. Skipping initialization.")
+	}
 }
 
 // Data Models
 type Recipe struct {
-	ID           string    `json:"id" example:"c0283p3d0cvuglq85log"`
-	Name         string    `json:"name" binding:"required" example:"Chocolate Chip Cookies"`
-	Tags         []string  `json:"tags" example:"dessert,snack"`
-	Ingredients  []string  `json:"ingredients" binding:"required" example:"2 1/4 cups all-purpose flour,1 tsp baking soda,1 cup butter,3/4 cup granulated sugar,3/4 cup brown sugar,2 large eggs,2 cups semi-sweet chocolate chips"`
-	Instructions []string  `json:"instructions" example:"Preheat oven to 375°F (190°C),Mix dry ingredients,Cream butter and sugars,Beat in eggs,Stir in chocolate chips,Drop spoonfuls onto baking sheets,Bake for 9 to 11 minutes"`
-	PublishedAt  time.Time `json:"published_at" example:"2023-03-10T15:04:05Z"`
+	Name         string    `json:"name" bson:"name" binding:"required" example:"Chocolate Chip Cookies"`
+	Tags         []string  `json:"tags" bson:"tags" binding:"required" example:"dessert,snack"`
+	Ingredients  []string  `json:"ingredients" bson:"ingredients" binding:"required" example:"2 1/4 cups all-purpose flour,1 tsp baking soda,1 cup butter,3/4 cup granulated sugar,3/4 cup brown sugar,2 large eggs,2 cups semi-sweet chocolate chips"`
+	Instructions []string  `json:"instructions" bson:"instructions" binding:"required" example:"Preheat oven to 375°F (190°C),Mix dry ingredients,Cream butter and sugars,Beat in eggs,Stir in chocolate chips,Drop spoonfuls onto baking sheets,Bake for 9 to 11 minutes"`
+	PublishedAt  time.Time `json:"published_at" bson:"published_at" example:"2023-03-10T15:04:05Z"`
+}
+
+type ViewRecipe struct {
+	ID           bson.ObjectID `json:"id" bson:"_id" example:"c0283p3d0cvuglq85log"`
+	Name         string        `json:"name" bson:"name" example:"Chocolate Chip Cookies"`
+	Tags         []string      `json:"tags" bson:"tags" example:"dessert,snack"`
+	Ingredients  []string      `json:"ingredients" bson:"ingredients" example:"2 1/4 cups all-purpose flour,1 tsp baking soda,1 cup butter,3/4 cup granulated sugar,3/4 cup brown sugar,2 large eggs,2 cups semi-sweet chocolate chips"`
+	Instructions []string      `json:"instructions" bson:"instructions" example:"Preheat oven to 375°F (190°C),Mix dry ingredients,Cream butter and sugars,Beat in eggs,Stir in chocolate chips,Drop spoonfuls onto baking sheets,Bake for 9 to 11 minutes"`
+	PublishedAt  time.Time     `json:"published_at" bson:"published_at" example:"2023-03-10T15:04:05Z"`
 }
 
 type AddUpdateRecipe struct {
 	Name         string   `json:"name" binding:"required" example:"Chocolate Chip Cookies"`
-	Tags         []string `json:"tags" example:"dessert,snack"`
+	Tags         []string `json:"tags" binding:"required" example:"dessert,snack"`
 	Ingredients  []string `json:"ingredients" binding:"required" example:"2 1/4 cups all-purpose flour,1 tsp baking soda,1 cup butter,3/4 cup granulated sugar,3/4 cup brown sugar,2 large eggs,2 cups semi-sweet chocolate chips"`
-	Instructions []string `json:"instructions" example:"Preheat oven to 375°F (190°C),Mix dry ingredients,Cream butter and sugars,Beat in eggs,Stir in chocolate chips,Drop spoonfuls onto baking sheets,Bake for 9 to 11 minutes"`
+	Instructions []string `json:"instructions" binding:"required" example:"Preheat oven to 375°F (190°C),Mix dry ingredients,Cream butter and sugars,Beat in eggs,Stir in chocolate chips,Drop spoonfuls onto baking sheets,Bake for 9 to 11 minutes"`
 }
 
 type ListRecipes struct {
-	Count int      `json:"count"`
-	Data  []Recipe `json:"data"`
+	Count int          `json:"count"`
+	Data  []ViewRecipe `json:"data"`
 }
 
 type SearchParams struct {
@@ -61,14 +86,15 @@ type SearchParams struct {
 //	@Tags			recipes
 //	@Accept			json
 //	@Produce		json
-//	@Param			recipe	body		AddUpdateRecipe	true	"Add Recipe"
-//	@Success		201		{object}	Recipe
-//	@Failure		400		{object}	httputil.HTTPError
+//	@Param			recipe	body	AddUpdateRecipe	true	"Add Recipe"
+//	@Success		201
+//	@Failure		400	{object}	utils.HTTPError
+//	@Failure		500	{object}	utils.HTTPError
 //	@Router			/recipes [post]
 func NewRecipeHandler(c *gin.Context) {
 	var addRecipe AddUpdateRecipe
 	if err := c.ShouldBindJSON(&addRecipe); err != nil {
-		httputil.NewError(c, http.StatusBadRequest, err)
+		utils.NewError(c, http.StatusBadRequest, err)
 		return
 	}
 
@@ -78,12 +104,20 @@ func NewRecipeHandler(c *gin.Context) {
 		Ingredients:  addRecipe.Ingredients,
 		Instructions: addRecipe.Instructions,
 	}
-
-	recipe.ID = xid.New().String()
 	recipe.PublishedAt = time.Now()
 
-	recipes = append(recipes, recipe)
-	c.JSON(http.StatusCreated, recipe)
+	config := config.GetConfig()
+	collection := database.GetCollection(config, "recipes")
+
+	result, err := collection.InsertOne(context.TODO(), recipe)
+	if err != nil {
+		log.Println("error inserting documents: ", err)
+		utils.NewError(c, http.StatusInternalServerError, err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, result)
+
 }
 
 // ListRecipesHandler godoc
@@ -94,8 +128,31 @@ func NewRecipeHandler(c *gin.Context) {
 //	@Accept			json
 //	@Produce		json
 //	@Success		200	{object}	ListRecipes
+//	@Failure		500	{object}	utils.HTTPError
 //	@Router			/recipes [get]
 func ListRecipesHandler(c *gin.Context) {
+	config := config.GetConfig()
+	collection := database.GetCollection(config, "recipes")
+
+	cursor, err := collection.Find(context.TODO(), bson.D{})
+	if err != nil {
+		log.Println("Error finding documents: ", err)
+		utils.NewError(c, http.StatusInternalServerError, err)
+		return
+	}
+	defer cursor.Close(context.TODO())
+
+	recipes := make([]ViewRecipe, 0)
+	for cursor.Next(context.TODO()) {
+		var recipe ViewRecipe
+		if err := cursor.Decode(&recipe); err != nil {
+			log.Println("Error decoding document: ", err)
+			utils.NewError(c, http.StatusInternalServerError, err)
+			return
+		}
+		recipes = append(recipes, recipe)
+	}
+
 	c.JSON(http.StatusOK, ListRecipes{
 		Count: len(recipes),
 		Data:  recipes,
@@ -109,44 +166,50 @@ func ListRecipesHandler(c *gin.Context) {
 //	@Tags			recipes
 //	@Accept			json
 //	@Produce		json
-//	@Param			id	path		string	true	"Recipe ID"
-//	@Param			recipe	body		AddUpdateRecipe	true	"Update Recipe"
-//	@Success		200		{object}	Recipe
-//	@Failure		400		{object}	httputil.HTTPError
+//	@Param			id		path	string			true	"Recipe ID"
+//	@Param			recipe	body	AddUpdateRecipe	true	"Update Recipe"
+//	@Success		200
+//	@Failure		400	{object}	utils.HTTPError
+//	@Failure		500	{object}	utils.HTTPError
 //	@Router			/recipes/{id} [put]
 func UpdateRecipeHandler(c *gin.Context) {
 	id := c.Param("id")
 
+	objectID, err := bson.ObjectIDFromHex(id)
+	if err != nil {
+		utils.NewError(c, http.StatusBadRequest, err)
+		return
+	}
+
 	var updateRecipe AddUpdateRecipe
 	if err := c.ShouldBindJSON(&updateRecipe); err != nil {
-		httputil.NewError(c, http.StatusBadRequest, err)
+		utils.NewError(c, http.StatusBadRequest, err)
 		return
 	}
 
-	index := -1
-	for i := 0; i < len(recipes); i++ {
-		if recipes[i].ID == id {
-			index = i
-			break
-		}
-	}
+	filter := bson.D{{Key: "_id", Value: objectID}}
+	updateDoc := bson.D{{
+		Key: "$set",
+		Value: bson.D{
+			{Key: "name", Value: updateRecipe.Name},
+			{Key: "tags", Value: updateRecipe.Tags},
+			{Key: "ingredients", Value: updateRecipe.Ingredients},
+			{Key: "instructions", Value: updateRecipe.Instructions},
+			{Key: "published_at", Value: time.Now()},
+		}}}
 
-	if index == -1 {
-		httputil.NewError(c, http.StatusBadRequest, errors.New("Recipe not found"))
+	config := config.GetConfig()
+	collection := database.GetCollection(config, "recipes")
+
+	result, err := collection.UpdateOne(context.TODO(), filter, updateDoc)
+	if err != nil {
+		log.Println("Error updating document: ", err)
+		utils.NewError(c, http.StatusInternalServerError, err)
 		return
 	}
 
-	recipe := Recipe{
-		Name:         updateRecipe.Name,
-		Tags:         updateRecipe.Tags,
-		Ingredients:  updateRecipe.Ingredients,
-		Instructions: updateRecipe.Instructions,
-	}
+	c.JSON(http.StatusOK, result)
 
-	recipe.ID = id
-	recipe.PublishedAt = time.Now()
-	recipes[index] = recipe
-	c.JSON(http.StatusOK, recipe)
 }
 
 // DeleteRecipeHandler godoc
@@ -156,28 +219,31 @@ func UpdateRecipeHandler(c *gin.Context) {
 //	@Tags			recipes
 //	@Accept			json
 //	@Produce		json
-//	@Param			id	path		string	true	"Recipe ID"
-//	@Success		204		{object}	Recipe
-//	@Failure		400		{object}	httputil.HTTPError
+//	@Param			id	path	string	true	"Recipe ID"
+//	@Success		204
+//	@Failure		400	{object}	utils.HTTPError
+//	@Failure		500	{object}	utils.HTTPError
 //	@Router			/recipes/{id} [delete]
 func DeleteRecipeHandler(c *gin.Context) {
 	id := c.Param("id")
-
-	index := -1
-	for i := 0; i < len(recipes); i++ {
-		if recipes[i].ID == id {
-			index = i
-			break
-		}
-	}
-
-	if index == -1 {
-		httputil.NewError(c, http.StatusBadRequest, errors.New("Recipe not found"))
+	objectID, err := bson.ObjectIDFromHex(id)
+	if err != nil {
+		utils.NewError(c, http.StatusBadRequest, err)
 		return
 	}
 
-	recipes = append(recipes[:index], recipes[index+1:]...)
-	c.JSON(http.StatusNoContent, nil)
+	filter := bson.D{{Key: "_id", Value: objectID}}
+	config := config.GetConfig()
+	collection := database.GetCollection(config, "recipes")
+
+	result, err := collection.DeleteOne(context.TODO(), filter)
+	if err != nil {
+		log.Println("Error deleting document: ", err)
+		utils.NewError(c, http.StatusInternalServerError, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // SearchRecipeHandler godoc
@@ -189,38 +255,61 @@ func DeleteRecipeHandler(c *gin.Context) {
 //	@Produce		json
 //	@Param			tag	query		string	true	"Tag to search for"
 //	@Success		200	{object}	ListRecipes
-//	@Failure		400	{object}	httputil.HTTPError
+//	@Failure		400	{object}	utils.HTTPError
+//	@Failure		500	{object}	utils.HTTPError
 //	@Router			/recipes/search [get]
 func SearchRecipeHandler(c *gin.Context) {
 	var searchParams SearchParams
 
 	if err := c.ShouldBindQuery(&searchParams); err != nil {
-		httputil.NewError(c, http.StatusBadRequest, err)
+		utils.NewError(c, http.StatusBadRequest, err)
 		return
 	}
 
-	listOfRecipes := make([]Recipe, 0)
+	filter := bson.D{{Key: "tags", Value: bson.D{{Key: "$in", Value: []string{searchParams.Tag}}}}}
+	config := config.GetConfig()
+	collection := database.GetCollection(config, "recipes")
 
-	for _, recipe := range recipes {
-		if slices.Contains(recipe.Tags, searchParams.Tag) {
-			listOfRecipes = append(listOfRecipes, recipe)
+	cursor, err := collection.Find(context.TODO(), filter)
+	if err != nil {
+		log.Println("Error finding documents: ", err)
+		utils.NewError(c, http.StatusInternalServerError, err)
+		return
+	}
+	defer cursor.Close(context.TODO())
+
+	recipes := make([]ViewRecipe, 0)
+	for cursor.Next(context.TODO()) {
+		var recipe ViewRecipe
+		if err := cursor.Decode(&recipe); err != nil {
+			log.Println("Error decoding document: ", err)
+			utils.NewError(c, http.StatusInternalServerError, err)
+			return
 		}
+		recipes = append(recipes, recipe)
 	}
 
 	c.JSON(http.StatusOK, ListRecipes{
-		Count: len(listOfRecipes),
-		Data:  listOfRecipes,
+		Count: len(recipes),
+		Data:  recipes,
 	})
+
 }
 
-// @Title			Recipes API
-// @Version		1.0
-// @Description	This is a simple API for managing recipes.
+//	@Title			Recipes API
+//	@Version		1.0
+//	@Description	This is a simple API for managing recipes.
 //
-// @Host			localhost:8080
-// @BasePath		/
+//	@Host			localhost:8080
+//	@BasePath		/
 func main() {
-	initDb()
+	config := config.GetConfig()
+
+	gin.SetMode(config.GinMode)
+
+	database.ConnectToDB(config)
+	initDb(config)
+
 	router := gin.Default()
 
 	router.POST("/recipes", NewRecipeHandler)

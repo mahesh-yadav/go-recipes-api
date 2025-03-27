@@ -3,9 +3,11 @@ module github.com/mahesh-yadav/go-recipes-api
 go 1.23.5
 
 require (
+	github.com/caarlos0/env/v11 v11.3.1
 	github.com/gin-gonic/gin v1.10.0
-	github.com/rs/xid v1.6.0
+	github.com/joho/godotenv v1.5.1
 	github.com/swaggo/swag v1.16.4
+	go.mongodb.org/mongo-driver/v2 v2.1.0
 )
 
 require (
@@ -14,8 +16,15 @@ require (
 	github.com/go-openapi/jsonreference v0.21.0 // indirect
 	github.com/go-openapi/spec v0.21.0 // indirect
 	github.com/go-openapi/swag v0.23.1 // indirect
+	github.com/golang/snappy v0.0.4 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
+	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
+	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
+	github.com/xdg-go/scram v1.1.2 // indirect
+	github.com/xdg-go/stringprep v1.0.4 // indirect
+	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
+	golang.org/x/sync v0.12.0 // indirect
 	golang.org/x/tools v0.31.0 // indirect
 )
 

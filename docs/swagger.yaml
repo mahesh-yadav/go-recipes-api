@@ -1,14 +1,5 @@
 basePath: /
 definitions:
-  httputil.HTTPError:
-    properties:
-      code:
-        example: 400
-        type: integer
-      message:
-        example: status bad request
-        type: string
-    type: object
   main.AddUpdateRecipe:
     properties:
       ingredients:
@@ -47,7 +38,9 @@ definitions:
         type: array
     required:
     - ingredients
+    - instructions
     - name
+    - tags
     type: object
   main.ListRecipes:
     properties:
@@ -55,10 +48,10 @@ definitions:
         type: integer
       data:
         items:
-          $ref: '#/definitions/main.Recipe'
+          $ref: '#/definitions/main.ViewRecipe'
         type: array
     type: object
-  main.Recipe:
+  main.ViewRecipe:
     properties:
       id:
         example: c0283p3d0cvuglq85log
@@ -100,9 +93,15 @@ definitions:
         items:
           type: string
         type: array
-    required:
-    - ingredients
-    - name
+    type: object
+  utils.HTTPError:
+    properties:
+      code:
+        example: 400
+        type: integer
+      message:
+        example: status bad request
+        type: string
     type: object
 host: localhost:8080
 info:
@@ -123,6 +122,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/main.ListRecipes'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.HTTPError'
       summary: List Recipes
       tags:
       - recipes
@@ -142,12 +145,14 @@ paths:
       responses:
         "201":
           description: Created
-          schema:
-            $ref: '#/definitions/main.Recipe'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/httputil.HTTPError'
+            $ref: '#/definitions/utils.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.HTTPError'
       summary: Create a new recipe
       tags:
       - recipes
@@ -167,12 +172,14 @@ paths:
       responses:
         "204":
           description: No Content
-          schema:
-            $ref: '#/definitions/main.Recipe'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/httputil.HTTPError'
+            $ref: '#/definitions/utils.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.HTTPError'
       summary: Delete a recipe
       tags:
       - recipes
@@ -197,12 +204,14 @@ paths:
       responses:
         "200":
           description: OK
-          schema:
-            $ref: '#/definitions/main.Recipe'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/httputil.HTTPError'
+            $ref: '#/definitions/utils.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.HTTPError'
       summary: Update a recipe
       tags:
       - recipes
@@ -227,7 +236,11 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/httputil.HTTPError'
+            $ref: '#/definitions/utils.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.HTTPError'
       summary: Search recipes by tag
       tags:
       - recipes

@@ -34,6 +34,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/main.ListRecipes"
                         }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.HTTPError"
+                        }
                     }
                 }
             },
@@ -62,15 +68,18 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/main.Recipe"
-                        }
+                        "description": "Created"
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/httputil.HTTPError"
+                            "$ref": "#/definitions/utils.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.HTTPError"
                         }
                     }
                 }
@@ -108,7 +117,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/httputil.HTTPError"
+                            "$ref": "#/definitions/utils.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.HTTPError"
                         }
                     }
                 }
@@ -147,15 +162,18 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/main.Recipe"
-                        }
+                        "description": "OK"
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/httputil.HTTPError"
+                            "$ref": "#/definitions/utils.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.HTTPError"
                         }
                     }
                 }
@@ -183,15 +201,18 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "204": {
-                        "description": "No Content",
-                        "schema": {
-                            "$ref": "#/definitions/main.Recipe"
-                        }
+                        "description": "No Content"
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/httputil.HTTPError"
+                            "$ref": "#/definitions/utils.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.HTTPError"
                         }
                     }
                 }
@@ -199,24 +220,13 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "httputil.HTTPError": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer",
-                    "example": 400
-                },
-                "message": {
-                    "type": "string",
-                    "example": "status bad request"
-                }
-            }
-        },
         "main.AddUpdateRecipe": {
             "type": "object",
             "required": [
                 "ingredients",
-                "name"
+                "instructions",
+                "name",
+                "tags"
             ],
             "properties": {
                 "ingredients": {
@@ -274,17 +284,13 @@ const docTemplate = `{
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/main.Recipe"
+                        "$ref": "#/definitions/main.ViewRecipe"
                     }
                 }
             }
         },
-        "main.Recipe": {
+        "main.ViewRecipe": {
             "type": "object",
-            "required": [
-                "ingredients",
-                "name"
-            ],
             "properties": {
                 "id": {
                     "type": "string",
@@ -337,6 +343,19 @@ const docTemplate = `{
                         "dessert",
                         "snack"
                     ]
+                }
+            }
+        },
+        "utils.HTTPError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 400
+                },
+                "message": {
+                    "type": "string",
+                    "example": "status bad request"
                 }
             }
         }

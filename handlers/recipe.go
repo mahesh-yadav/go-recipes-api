@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mahesh-yadav/go-recipes-api/config"
 	"github.com/mahesh-yadav/go-recipes-api/models"
-	"github.com/mahesh-yadav/go-recipes-api/utils"
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -35,13 +35,13 @@ func NewRecipeHandler(ctx context.Context, collection *mongo.Collection, redisCl
 
 // ListRecipesHandler godoc
 //
-//	@Summary		List Recipes
-//	@Description	Returns list of recipes
+//	@Summary		List all recipes
+//	@Description	Get a list of all recipes
 //	@Tags			recipes
 //	@Accept			json
 //	@Produce		json
 //	@Success		200	{object}	models.ListRecipes
-//	@Failure		500	{object}	utils.HTTPError
+//	@Failure		500	{object}	models.ErrorResponse
 //	@Router			/recipes [get]
 func (handler *RecipeHandler) ListRecipesHandler(c *gin.Context) {
 	var redisResults string
@@ -54,8 +54,7 @@ func (handler *RecipeHandler) ListRecipesHandler(c *gin.Context) {
 
 		cursor, err := handler.collection.Find(context.TODO(), bson.D{})
 		if err != nil {
-			utils.NewError(c, http.StatusInternalServerError, err)
-			return
+			log.Panic().Msg("Error fetching recipes from MongoDB")
 		}
 		defer cursor.Close(handler.ctx)
 
@@ -63,8 +62,7 @@ func (handler *RecipeHandler) ListRecipesHandler(c *gin.Context) {
 		for cursor.Next(context.TODO()) {
 			var recipe models.ViewRecipe
 			if err := cursor.Decode(&recipe); err != nil {
-				utils.NewError(c, http.StatusInternalServerError, err)
-				return
+				log.Panic().Msg("Error decoding recipe from MongoDB")
 			}
 			recipes = append(recipes, recipe)
 		}
@@ -72,8 +70,7 @@ func (handler *RecipeHandler) ListRecipesHandler(c *gin.Context) {
 		if handler.config.EnableRedisCache {
 			data, err := json.Marshal(recipes)
 			if err != nil {
-				utils.NewError(c, http.StatusInternalServerError, err)
-				return
+				log.Panic().Msg("Error marshalling recipies to JSON")
 			}
 			handler.redisClient.Set(handler.ctx, "recipes", string(data), 0)
 		}
@@ -83,15 +80,13 @@ func (handler *RecipeHandler) ListRecipesHandler(c *gin.Context) {
 			Data:  recipes,
 		})
 	} else if err != nil {
-		utils.NewError(c, http.StatusInternalServerError, err)
-		return
+		log.Panic().Msg("Error fetching recipies from Redis cache")
 	} else {
 		log.Info().Msg("Retrieved from Redis cache...")
 		recipes := make([]models.ViewRecipe, 0)
 		err := json.Unmarshal([]byte(redisResults), &recipes)
 		if err != nil {
-			utils.NewError(c, http.StatusInternalServerError, err)
-			return
+			log.Panic().Msg("Error unmarshalling recipies from Redis cache to JSON")
 		}
 
 		c.JSON(http.StatusOK, models.ListRecipes{
@@ -103,23 +98,27 @@ func (handler *RecipeHandler) ListRecipesHandler(c *gin.Context) {
 
 // GetRecipeHandler godoc
 //
-//	@Summary		Get a recipe
-//	@Description	Returns a single recipe
+//	@Summary		Get a recipe by ID
+//	@Description	Get details of a specific recipe by its ID
 //	@Tags			recipes
 //	@Accept			json
 //	@Produce		json
 //	@Param			id	path		string	true	"Recipe ID"
 //	@Success		200	{object}	models.ViewRecipe
-//	@Failure		400	{object}	utils.HTTPError
-//	@Failure		404	{object}	utils.HTTPError
-//	@Failure		500	{object}	utils.HTTPError
+//	@Failure		400	{object}	models.ErrorResponse
+//	@Failure		404	{object}	models.ErrorResponse
+//	@Failure		500	{object}	models.ErrorResponse
 //	@Router			/recipes/{id} [get]
 func (handler *RecipeHandler) GetRecipeHandler(c *gin.Context) {
 	id := c.Param("id")
 
 	objectID, err := bson.ObjectIDFromHex(id)
 	if err != nil {
-		utils.NewError(c, http.StatusBadRequest, err)
+		log.Error().Str("ID", id).Msg("Invalid Recipe ID")
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: "Invalid Recipe ID",
+		})
 		return
 	}
 
@@ -129,12 +128,14 @@ func (handler *RecipeHandler) GetRecipeHandler(c *gin.Context) {
 	err = handler.collection.FindOne(handler.ctx, filter).Decode(&recipe)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			utils.NewError(c, http.StatusNotFound, err)
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Code:    http.StatusNotFound,
+				Message: fmt.Sprintf("Recipe not found with ID: %s", id),
+			})
 			return
 		}
 
-		utils.NewError(c, http.StatusInternalServerError, err)
-		return
+		log.Panic().Msg("Error fetching recipe from MongoDB")
 	}
 
 	c.JSON(http.StatusOK, recipe)
@@ -149,13 +150,16 @@ func (handler *RecipeHandler) GetRecipeHandler(c *gin.Context) {
 //	@Produce		json
 //	@Param			recipe	body	models.AddUpdateRecipe	true	"Add Recipe"
 //	@Success		201
-//	@Failure		400	{object}	utils.HTTPError
-//	@Failure		500	{object}	utils.HTTPError
+//	@Failure		400	{object}	models.ErrorResponse
+//	@Failure		500	{object}	models.ErrorResponse
 //	@Router			/recipes [post]
 func (handler *RecipeHandler) CreateRecipeHandler(c *gin.Context) {
 	var addRecipe models.AddUpdateRecipe
 	if err := c.ShouldBindJSON(&addRecipe); err != nil {
-		utils.NewError(c, http.StatusBadRequest, err)
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: "Invalid Recipe data",
+		})
 		return
 	}
 
@@ -169,8 +173,7 @@ func (handler *RecipeHandler) CreateRecipeHandler(c *gin.Context) {
 
 	result, err := handler.collection.InsertOne(handler.ctx, recipe)
 	if err != nil {
-		utils.NewError(c, http.StatusInternalServerError, err)
-		return
+		log.Panic().Msg("Error inserting recipe into MongoDB")
 	}
 
 	if handler.config.EnableRedisCache {
@@ -190,21 +193,28 @@ func (handler *RecipeHandler) CreateRecipeHandler(c *gin.Context) {
 //	@Param			id		path	string					true	"Recipe ID"
 //	@Param			recipe	body	models.AddUpdateRecipe	true	"Update Recipe"
 //	@Success		200
-//	@Failure		400	{object}	utils.HTTPError
-//	@Failure		500	{object}	utils.HTTPError
+//	@Failure		400	{object}	models.ErrorResponse
+//	@Failure		500	{object}	models.ErrorResponse
 //	@Router			/recipes/{id} [put]
 func (handler *RecipeHandler) UpdateRecipeHandler(c *gin.Context) {
 	id := c.Param("id")
 
 	objectID, err := bson.ObjectIDFromHex(id)
 	if err != nil {
-		utils.NewError(c, http.StatusBadRequest, err)
+		log.Error().Str("ID", id).Msg("Invalid Recipe ID")
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: "Invalid Recipe ID",
+		})
 		return
 	}
 
 	var updateRecipe models.AddUpdateRecipe
 	if err := c.ShouldBindJSON(&updateRecipe); err != nil {
-		utils.NewError(c, http.StatusBadRequest, err)
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: "Invalid Recipe data",
+		})
 		return
 	}
 
@@ -221,7 +231,7 @@ func (handler *RecipeHandler) UpdateRecipeHandler(c *gin.Context) {
 
 	result, err := handler.collection.UpdateOne(handler.ctx, filter, updateDoc)
 	if err != nil {
-		utils.NewError(c, http.StatusInternalServerError, err)
+		log.Panic().Msg("Error updating recipe in MongoDB")
 		return
 	}
 
@@ -241,14 +251,18 @@ func (handler *RecipeHandler) UpdateRecipeHandler(c *gin.Context) {
 //	@Produce		json
 //	@Param			id	path	string	true	"Recipe ID"
 //	@Success		204
-//	@Failure		400	{object}	utils.HTTPError
-//	@Failure		500	{object}	utils.HTTPError
+//	@Failure		400	{object}	models.ErrorResponse
+//	@Failure		500	{object}	models.ErrorResponse
 //	@Router			/recipes/{id} [delete]
 func (handler *RecipeHandler) DeleteRecipeHandler(c *gin.Context) {
 	id := c.Param("id")
 	objectID, err := bson.ObjectIDFromHex(id)
 	if err != nil {
-		utils.NewError(c, http.StatusBadRequest, err)
+		log.Error().Str("ID", id).Msg("Invalid Recipe ID")
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: "Invalid Recipe ID",
+		})
 		return
 	}
 
@@ -256,7 +270,7 @@ func (handler *RecipeHandler) DeleteRecipeHandler(c *gin.Context) {
 
 	result, err := handler.collection.DeleteOne(handler.ctx, filter)
 	if err != nil {
-		utils.NewError(c, http.StatusInternalServerError, err)
+		log.Panic().Msg("Error deleting recipe in MongoDB")
 		return
 	}
 
@@ -276,14 +290,17 @@ func (handler *RecipeHandler) DeleteRecipeHandler(c *gin.Context) {
 //	@Produce		json
 //	@Param			tag	query		string	true	"Tag to search for"
 //	@Success		200	{object}	models.ListRecipes
-//	@Failure		400	{object}	utils.HTTPError
-//	@Failure		500	{object}	utils.HTTPError
+//	@Failure		400	{object}	models.ErrorResponse
+//	@Failure		500	{object}	models.ErrorResponse
 //	@Router			/recipes/search [get]
 func (handler *RecipeHandler) SearchRecipeHandler(c *gin.Context) {
 	var searchParams models.RecipeTagSearchParams
 
 	if err := c.ShouldBindQuery(&searchParams); err != nil {
-		utils.NewError(c, http.StatusBadRequest, err)
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: "Invalid Recipe search parameters",
+		})
 		return
 	}
 
@@ -291,7 +308,7 @@ func (handler *RecipeHandler) SearchRecipeHandler(c *gin.Context) {
 
 	cursor, err := handler.collection.Find(handler.ctx, filter)
 	if err != nil {
-		utils.NewError(c, http.StatusInternalServerError, err)
+		log.Panic().Msg("Error searching recipes in MongoDB")
 		return
 	}
 	defer cursor.Close(handler.ctx)
@@ -300,7 +317,7 @@ func (handler *RecipeHandler) SearchRecipeHandler(c *gin.Context) {
 	for cursor.Next(handler.ctx) {
 		var recipe models.ViewRecipe
 		if err := cursor.Decode(&recipe); err != nil {
-			utils.NewError(c, http.StatusInternalServerError, err)
+			log.Panic().Msg("Error decoding recipe from MongoDB")
 			return
 		}
 		recipes = append(recipes, recipe)

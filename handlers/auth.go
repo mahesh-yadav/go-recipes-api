@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"net/http"
 	"time"
 
@@ -12,7 +11,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/mahesh-yadav/go-recipes-api/config"
 	"github.com/mahesh-yadav/go-recipes-api/models"
-	"github.com/mahesh-yadav/go-recipes-api/utils"
+	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
@@ -41,10 +40,25 @@ type JWTOutput struct {
 	Expires time.Time `json:"expires"`
 }
 
+// SignUpHandler godoc
+//
+//	@Summary		Sign up a new user
+//	@Description	Create a new user account
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			user	body	models.User	true	"User Sign Up"
+//	@Success		201
+//	@Failure		400	{object}	models.ErrorResponse
+//	@Failure		500	{object}	models.ErrorResponse
+//	@Router			/auth/signup [post]
 func (handler *AuthHandler) SignUpHandler(c *gin.Context) {
 	var user models.User
 	if err := c.ShouldBindJSON(&user); err != nil {
-		utils.NewError(c, http.StatusBadRequest, err)
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: "Invalid User data",
+		})
 		return
 	}
 
@@ -53,17 +67,33 @@ func (handler *AuthHandler) SignUpHandler(c *gin.Context) {
 	user.Password = hex.EncodeToString(h.Sum(nil))
 	result, err := handler.collection.InsertOne(handler.ctx, user)
 	if err != nil {
-		utils.NewError(c, http.StatusInternalServerError, err)
+		log.Panic().Msg("Error inserting user into MongoDB")
 		return
 	}
 
 	c.JSON(http.StatusCreated, result)
 }
 
+// SignInHandler godoc
+//
+//	@Summary		Sign in a user
+//	@Description	Authenticate a user and return a JWT token
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			user	body		models.User	true	"User Credentials"
+//	@Success		200		{object}	JWTOutput
+//	@Failure		400		{object}	models.ErrorResponse
+//	@Failure		401		{object}	models.ErrorResponse
+//	@Failure		500		{object}	models.ErrorResponse
+//	@Router			/auth/signin [post]
 func (handler *AuthHandler) SignInHandler(c *gin.Context) {
 	var user models.User
 	if err := c.ShouldBindJSON(&user); err != nil {
-		utils.NewError(c, http.StatusBadRequest, err)
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: "Invalid User data",
+		})
 		return
 	}
 
@@ -74,7 +104,10 @@ func (handler *AuthHandler) SignInHandler(c *gin.Context) {
 
 	cursor := handler.collection.FindOne(handler.ctx, filter)
 	if cursor.Err() != nil {
-		utils.NewError(c, http.StatusUnauthorized, errors.New("invalid credentials"))
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
+			Code:    http.StatusUnauthorized,
+			Message: "invalid credentials",
+		})
 		return
 	}
 
@@ -89,7 +122,7 @@ func (handler *AuthHandler) SignInHandler(c *gin.Context) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString([]byte(handler.config.JWTSecret))
 	if err != nil {
-		utils.NewError(c, http.StatusInternalServerError, err)
+		log.Panic().Msg("Error creating JWT token")
 		return
 	}
 	jwtOutput := JWTOutput{
@@ -100,6 +133,18 @@ func (handler *AuthHandler) SignInHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, jwtOutput)
 }
 
+// RefreshTokenHandler godoc
+//
+//	@Summary		Refresh JWT token
+//	@Description	Refresh an existing JWT token and return a new one
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			Authorization	header		string	true	"{token}"
+//	@Success		200				{object}	JWTOutput
+//	@Failure		401				{object}	models.ErrorResponse
+//	@Failure		500				{object}	models.ErrorResponse
+//	@Router			/auth/refresh [post]
 func (handler *AuthHandler) RefreshTokenHandler(c *gin.Context) {
 	tokenStr := c.GetHeader("Authorization")
 	claims := &Claims{}
@@ -109,11 +154,19 @@ func (handler *AuthHandler) RefreshTokenHandler(c *gin.Context) {
 	})
 
 	if err != nil {
-		c.AbortWithStatus(http.StatusUnauthorized)
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
+			Code:    http.StatusUnauthorized,
+			Message: "invalid token",
+		})
+		return
 	}
 
 	if token == nil || !token.Valid {
-		c.AbortWithStatus(http.StatusUnauthorized)
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
+			Code:    http.StatusUnauthorized,
+			Message: "invalid token",
+		})
+		return
 	}
 
 	expirationTime := time.Now().Add(time.Duration(handler.config.JWTExpirationTimeSeconds) * time.Second)
@@ -121,7 +174,7 @@ func (handler *AuthHandler) RefreshTokenHandler(c *gin.Context) {
 	newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	newTokenString, err := newToken.SignedString([]byte(handler.config.JWTSecret))
 	if err != nil {
-		utils.NewError(c, http.StatusInternalServerError, err)
+		log.Panic().Msg("Error creating JWT token")
 		return
 	}
 	jwtOutput := JWTOutput{
@@ -148,7 +201,6 @@ func (handler *AuthHandler) AuthMiddlewareJWT() gin.HandlerFunc {
 		if token == nil || !token.Valid {
 			c.AbortWithStatus(http.StatusUnauthorized)
 		}
-
 		c.Next()
 	}
 }

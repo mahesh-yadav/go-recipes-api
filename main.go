@@ -9,6 +9,7 @@ import (
 	_ "github.com/mahesh-yadav/go-recipes-api/docs"
 	"github.com/mahesh-yadav/go-recipes-api/handlers"
 	"github.com/mahesh-yadav/go-recipes-api/logger"
+	"github.com/mahesh-yadav/go-recipes-api/middleware"
 	"github.com/rs/zerolog/log"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -42,7 +43,8 @@ func main() {
 	userCollection := database.GetMongoCollection(config, "users")
 	authHandler := handlers.NewAuthHandler(ctx, config, userCollection)
 
-	router := gin.Default()
+	router := gin.New()
+	router.Use(gin.Logger(), middleware.GlobalErrorMiddleware())
 
 	router.GET("/recipes", recipesHandler.ListRecipesHandler)
 	router.POST("/auth/signup", authHandler.SignUpHandler)

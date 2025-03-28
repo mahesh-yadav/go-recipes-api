@@ -195,11 +195,19 @@ func (handler *AuthHandler) AuthMiddlewareJWT() gin.HandlerFunc {
 		})
 
 		if err != nil {
-			c.AbortWithStatus(http.StatusUnauthorized)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, models.ErrorResponse{
+				Code:    http.StatusUnauthorized,
+				Message: err.Error(),
+			})
+			return
 		}
 
 		if token == nil || !token.Valid {
-			c.AbortWithStatus(http.StatusUnauthorized)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, models.ErrorResponse{
+				Code:    http.StatusUnauthorized,
+				Message: "invalid token",
+			})
+			return
 		}
 		c.Next()
 	}

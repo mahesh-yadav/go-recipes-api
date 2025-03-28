@@ -9,7 +9,6 @@ import (
 	_ "github.com/mahesh-yadav/go-recipes-api/docs"
 	"github.com/mahesh-yadav/go-recipes-api/handlers"
 	"github.com/mahesh-yadav/go-recipes-api/logger"
-	"github.com/mahesh-yadav/go-recipes-api/middleware"
 	"github.com/rs/zerolog/log"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -31,23 +30,27 @@ func main() {
 	database.ConnectToMongoDB(config)
 
 	ctx := context.Background()
-	collection := database.GetMongoCollection(config, "recipes")
-
+	recipeCollection := database.GetMongoCollection(config, "recipes")
 	if config.InitializeDB {
-		database.InitDB(collection)
+		database.InitDB(recipeCollection)
 	}
-
 	database.ConnectToRedis(config)
 	redisClient := database.GetRedisClient(config)
 
-	recipesHandler := handlers.NewRecipeHandler(ctx, collection, redisClient, config)
+	recipesHandler := handlers.NewRecipeHandler(ctx, recipeCollection, redisClient, config)
+
+	userCollection := database.GetMongoCollection(config, "users")
+	authHandler := handlers.NewAuthHandler(ctx, config, userCollection)
 
 	router := gin.Default()
 
 	router.GET("/recipes", recipesHandler.ListRecipesHandler)
+	router.POST("/auth/signup", authHandler.SignUpHandler)
+	router.POST("/auth/signin", authHandler.SignInHandler)
+	router.POST("/auth/refresh", authHandler.AuthMiddlewareJWT(), authHandler.RefreshTokenHandler)
 
 	authorized := router.Group("/")
-	authorized.Use(middleware.AuthMiddlewareAPIKey())
+	authorized.Use(authHandler.AuthMiddlewareJWT())
 	{
 		authorized.POST("/recipes", recipesHandler.CreateRecipeHandler)
 		authorized.GET("/recipes/:id", recipesHandler.GetRecipeHandler)

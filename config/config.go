@@ -27,6 +27,8 @@ type Config struct {
 	RedisPassword                 string `env:"REDIS_PASSWORD"`
 	RedisDB                       int    `env:"REDIS_DB" envDefault:"0"`
 	EnableRedisCache              bool   `env:"ENABLE_REDIS_CACHE" envDefault:"false"`
+	JWTSecret                     string `env:"JWT_SECRET,notEmpty"`
+	JWTExpirationTimeSeconds      int    `env:"JWT_EXPIRATION_TIME_SECONDS" envDefault:"600"`
 }
 
 func (c *Config) GetLogLevel() zerolog.Level {

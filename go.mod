@@ -12,6 +12,7 @@ require (
 )
 
 require (
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/rs/zerolog v1.34.0
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0

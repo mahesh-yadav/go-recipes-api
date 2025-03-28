@@ -1,5 +1,12 @@
 basePath: /
 definitions:
+  handlers.JWTOutput:
+    properties:
+      expires:
+        type: string
+      token:
+        type: string
+    type: object
   models.AddUpdateRecipe:
     properties:
       ingredients:
@@ -42,6 +49,13 @@ definitions:
     - name
     - tags
     type: object
+  models.ErrorResponse:
+    properties:
+      code:
+        type: integer
+      message:
+        type: string
+    type: object
   models.ListRecipes:
     properties:
       count:
@@ -50,6 +64,16 @@ definitions:
         items:
           $ref: '#/definitions/models.ViewRecipe'
         type: array
+    type: object
+  models.User:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
     type: object
   models.ViewRecipe:
     properties:
@@ -93,20 +117,6 @@ definitions:
         items:
           type: string
         type: array
-    required:
-    - ingredients
-    - instructions
-    - name
-    - tags
-    type: object
-  utils.HTTPError:
-    properties:
-      code:
-        example: 400
-        type: integer
-      message:
-        example: status bad request
-        type: string
     type: object
 host: localhost:8080
 info:
@@ -115,11 +125,102 @@ info:
   title: Recipes API
   version: "1.0"
 paths:
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Refresh an existing JWT token and return a new one
+      parameters:
+      - description: '{token}'
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.JWTOutput'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Refresh JWT token
+      tags:
+      - auth
+  /auth/signin:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate a user and return a JWT token
+      parameters:
+      - description: User Credentials
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.User'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.JWTOutput'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Sign in a user
+      tags:
+      - auth
+  /auth/signup:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account
+      parameters:
+      - description: User Sign Up
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.User'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Sign up a new user
+      tags:
+      - auth
   /recipes:
     get:
       consumes:
       - application/json
-      description: Returns list of recipes
+      description: Get a list of all recipes
       produces:
       - application/json
       responses:
@@ -130,8 +231,8 @@ paths:
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/utils.HTTPError'
-      summary: List Recipes
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: List all recipes
       tags:
       - recipes
     post:
@@ -153,11 +254,11 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/utils.HTTPError'
+            $ref: '#/definitions/models.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/utils.HTTPError'
+            $ref: '#/definitions/models.ErrorResponse'
       summary: Create a new recipe
       tags:
       - recipes
@@ -180,18 +281,18 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/utils.HTTPError'
+            $ref: '#/definitions/models.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/utils.HTTPError'
+            $ref: '#/definitions/models.ErrorResponse'
       summary: Delete a recipe
       tags:
       - recipes
     get:
       consumes:
       - application/json
-      description: Returns a single recipe
+      description: Get details of a specific recipe by its ID
       parameters:
       - description: Recipe ID
         in: path
@@ -208,16 +309,16 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/utils.HTTPError'
+            $ref: '#/definitions/models.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/utils.HTTPError'
+            $ref: '#/definitions/models.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/utils.HTTPError'
-      summary: Get a recipe
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Get a recipe by ID
       tags:
       - recipes
     put:
@@ -244,11 +345,11 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/utils.HTTPError'
+            $ref: '#/definitions/models.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/utils.HTTPError'
+            $ref: '#/definitions/models.ErrorResponse'
       summary: Update a recipe
       tags:
       - recipes
@@ -273,11 +374,11 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/utils.HTTPError'
+            $ref: '#/definitions/models.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/utils.HTTPError'
+            $ref: '#/definitions/models.ErrorResponse'
       summary: Search recipes by tag
       tags:
       - recipes

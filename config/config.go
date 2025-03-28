@@ -42,15 +42,15 @@ func (c *Config) GetLogLevel() zerolog.Level {
 func loadConfig() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("error loading .env file")
+		log.Println("Warning: .env file not found, using environment variables")
 	}
 
 	config = &Config{}
 	if err := env.Parse(config); err != nil {
-		log.Fatal("error parsing config variables: ", err)
+		log.Fatal("Error parsing config variables: ", err)
 	}
 
-	log.Println("config loaded successfully")
+	log.Println("Config loaded successfully")
 }
 
 func GetConfig() *Config {
